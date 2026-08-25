@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Telegram Bot Panel</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  font-family:system-ui,Arial,sans-serif;
+  background:#0f172a;
+  color:#e5e7eb;
+}
+
+header{
+  padding:18px 20px;
+  background:#111827;
+  border-bottom:1px solid #263449;
+}
+
+h1{
+  margin:0;
+  font-size:22px;
+}
+
+main{
+  max-width:900px;
+  margin:auto;
+  padding:18px;
+}
+
+.card{
+  background:#111827;
+  border:1px solid #263449;
+  border-radius:16px;
+  padding:18px;
+  margin-bottom:16px;
+}
+
+h2{
+  margin-top:0;
+}
+
+label{
+  display:block;
+  margin:12px 0 6px;
+  color:#9ca3af;
+}
+
+input,textarea,button{
+  width:100%;
+  padding:12px;
+  border-radius:10px;
+  border:1px solid #334155;
+  background:#0b1220;
+  color:white;
+  font-size:16px;
+}
+
+textarea{
+  resize:vertical;
+}
+
+button{
+  background:#2563eb;
+  border:0;
+  font-weight:700;
+  margin-top:12px;
+  cursor:pointer;
+}
+
+.status{
+  padding:10px;
+  border-radius:10px;
+  background:#172033;
+  margin-top:10px;
+}
+
+.ok{
+  color:#4ade80;
+}
+
+.muted{
+  color:#94a3b8;
+}
+
+pre{
+  white-space:pre-wrap;
+  background:#080d16;
+  padding:12px;
+  border-radius:10px;
+  overflow:auto;
+}
+
+@media(max-width:600px){
+  main{
+    padding:12px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>🤖 Telegram Bot Panel</h1>
+</header>
+
+<main>
+
+<div class="card">
+  <h2>🔌 Conexión</h2>
+
+  <label>Token del bot</label>
+
+  <input
+    id="token"
+    type="password"
+    placeholder="Pega aquí el token de BotFather"
+  >
+
+  <button onclick="connect()">
+    Conectar bot
+  </button>
+
+  <div id="status" class="status muted">
+    Desconectado
+  </div>
+</div>
+
+
+<div class="card">
+
+  <h2>💬 Enviar mensaje</h2>
+
+  <label>Chat ID</label>
+
+  <input
+    id="chatId"
+    placeholder="Ejemplo: 123456789"
+  >
+
+  <label>Mensaje</label>
+
+  <textarea
+    id="message"
+    rows="5"
+    placeholder="Escribe tu mensaje..."
+  ></textarea>
+
+  <button onclick="sendMessage()">
+    📤 Enviar mensaje
+  </button>
+
+  <div id="sendStatus" class="status muted"></div>
+
+</div>
+
+
+<div class="card">
+
+  <h2>🤖 Información del bot</h2>
+
+  <pre id="botInfo">Conecta el bot para ver la información.</pre>
+
+</div>
+
+
+<div class="card">
+
+  <h2>ℹ️ Cómo probarlo</h2>
+
+  <p class="muted">
+    Abre tu bot en Telegram y envíale /start.
+    Después podrás usar su Chat ID para enviar mensajes desde este panel.
+  </p>
+
+</div>
+
+</main>
+
+
+<script>
+
+async function connect(){
+
+  const token =
+    document.getElementById("token").value.trim();
+
+  if(!token){
+    alert("Pon el token de tu bot.");
+    return;
+  }
+
+  setStatus("⏳ Conectando...","");
+
+  try{
+
+    const response = await fetch(
+      "/api/bot-info",
+      {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+          token:token
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    if(!response.ok){
+      throw new Error(
+        data.error || "No se pudo conectar"
+      );
+    }
+
+    setStatus("🟢 Bot conectado","ok");
+
+    document.getElementById(
+      "botInfo"
+    ).textContent =
+      JSON.stringify(data.bot,null,2);
+
+    sessionStorage.setItem(
+      "botToken",
+      token
+    );
+
+  }catch(error){
+
+    setStatus(
+      "🔴 " + error.message,
+      ""
+    );
+
+  }
+}
+
+
+async function sendMessage(){
+
+  const token =
+    sessionStorage.getItem("botToken") ||
+    document.getElementById("token").value.trim();
+
+  const chatId =
+    document.getElementById("chatId").value.trim();
+
+  const text =
+    document.getElementById("message").value;
+
+  if(!token || !chatId || !text){
+
+    alert(
+      "Completa el token, Chat ID y mensaje."
+    );
+
+    return;
+  }
+
+  try{
+
+    const response = await fetch(
+      "/api/send",
+      {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+          token:token,
+          chatId:chatId,
+          text:text
+        })
+      }
+    );
+
+    const data =
+      await response.json();
+
+    if(response.ok){
+
+      document.getElementById(
+        "sendStatus"
+      ).textContent =
+        "✅ Mensaje enviado correctamente";
+
+    }else{
+
+      document.getElementById(
+        "sendStatus"
+      ).textContent =
+        "❌ " +
+        (data.error || "Error");
+
+    }
+
+  }catch(error){
+
+    document.getElementById(
+      "sendStatus"
+    ).textContent =
+      "❌ " + error.message;
+
+  }
+}
+
+
+function setStatus(text, className){
+
+  const element =
+    document.getElementById("status");
+
+  element.textContent = text;
+
+  element.className =
+    "status " + className;
+}
+
+</script>
+
+</body>
+</html>
